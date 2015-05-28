@@ -1,5 +1,7 @@
 package net.jpountz.jvm;
 
+import java.io.IOException;
+import java.util.Arrays;
 import java.util.Random;
 import java.util.zip.Adler32;
 import java.util.zip.CRC32;
@@ -7,163 +9,144 @@ import java.util.zip.CRC32;
 import net.jpountz.xxhash.XXHash32;
 import net.jpountz.xxhash.XXHashFactory;
 
-import com.google.caliper.Benchmark;
-import com.google.caliper.Param;
-import com.google.caliper.runner.CaliperMain;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
+import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.Level;
+import org.openjdk.jmh.annotations.Param;
+import org.openjdk.jmh.annotations.Scope;
+import org.openjdk.jmh.annotations.Setup;
+import org.openjdk.jmh.runner.Runner;
+import org.openjdk.jmh.runner.RunnerException;
+import org.openjdk.jmh.runner.options.Options;
+import org.openjdk.jmh.runner.options.OptionsBuilder;
 
-public class ChecksumBenchmark extends Benchmark {
+public class ChecksumBenchmark {
 
-  private static final CRC32 crc32 = new CRC32();
-  private static final Adler32 adler32 = new Adler32();
-  private static final HashFunction murmur3 = Hashing.murmur3_32();
-  private static final HashFunction sha1 = Hashing.sha1();
-  private static final HashFunction sha256 = Hashing.sha256();
-  private static final HashFunction sha512 = Hashing.sha512();
-  private static final HashFunction md5 = Hashing.md5();
-  private static final HashFunction goodFastHash32 = Hashing.goodFastHash(32);
-  private static final HashFunction goodFastHash64 = Hashing.goodFastHash(64);
-  private static final XXHash32 xxhash32JNI = XXHashFactory.nativeInstance().hash32();
-  private static final XXHash32 xxhash32Unsafe = XXHashFactory.unsafeInstance().hash32();
-  private static final XXHash32 xxhash32Safe = XXHashFactory.safeInstance().hash32();
-  private static final XXHash32 xxhash64JNI = XXHashFactory.nativeInstance().hash32();
-  private static final XXHash32 xxhash64Unsafe = XXHashFactory.unsafeInstance().hash32();
-  private static final XXHash32 xxhash64Safe = XXHashFactory.safeInstance().hash32();
+    private static final CRC32 crc32 = new CRC32();
+    private static final Adler32 adler32 = new Adler32();
+    private static final HashFunction murmur3 = Hashing.murmur3_32();
+    private static final HashFunction sha1 = Hashing.sha1();
+    private static final HashFunction sha256 = Hashing.sha256();
+    private static final HashFunction sha512 = Hashing.sha512();
+    private static final HashFunction md5 = Hashing.md5();
+    private static final HashFunction goodFastHash32 = Hashing.goodFastHash(32);
+    private static final HashFunction goodFastHash64 = Hashing.goodFastHash(64);
+    private static final XXHash32 xxhash32JNI = XXHashFactory.nativeInstance().hash32();
+    private static final XXHash32 xxhash32Unsafe = XXHashFactory.unsafeInstance().hash32();
+    private static final XXHash32 xxhash32Safe = XXHashFactory.safeInstance().hash32();
+    private static final XXHash32 xxhash64JNI = XXHashFactory.nativeInstance().hash32();
+    private static final XXHash32 xxhash64Unsafe = XXHashFactory.unsafeInstance().hash32();
+    private static final XXHash32 xxhash64Safe = XXHashFactory.safeInstance().hash32();
 
-  enum Checksum {
-    JAVA_ARRAYS_HASHCODE {
-      @Override
-      long checksum(byte[] bytes, int size) {
-        int hash = 1;
-        for (int i = 0; i < size; ++i) {
-          hash = 31 * hash + bytes[i];
+    @org.openjdk.jmh.annotations.State(Scope.Thread)
+    public static class State {
+
+        private final Random rng = new Random(0xCAFEBABE);
+        @Param({"16", "128", "1024", "8196", "65536", "524288"})
+        public int size;
+        public byte[] bytes;
+
+        @Setup(Level.Iteration)
+        public void prepare() {
+            bytes = new byte[size];
+            rng.nextBytes(bytes);
         }
-        return hash;
-      }
-    },
-    CRC32 {
-      long checksum(byte[] bytes, int size) {
-        crc32.reset();
-        crc32.update(bytes, 0, size);
-        return crc32.getValue();
-      }
-    },
-    ADLER32 {
-      long checksum(byte[] bytes, int size) {
-        adler32.reset();
-        adler32.update(bytes, 0, size);
-        return adler32.getValue();
-      }
-    },
-    MURMUR2 {
-      @Override
-      long checksum(byte[] bytes, int size) {
-        return MurmurHash2.hash32(bytes, 0, size);
-      }
-    },
-    MURMUR3 {
-      @Override
-      long checksum(byte[] bytes, int size) {
-        return murmur3.hashBytes(bytes, 0, size).asInt();
-      }
-    },
-    SHA1 {
-      @Override
-      long checksum(byte[] bytes, int size) {
-        return sha1.hashBytes(bytes, 0, size).asLong();
-      }
-    },
-    SHA256 {
-      @Override
-      long checksum(byte[] bytes, int size) {
-        return sha256.hashBytes(bytes, 0, size).asLong();
-      }
-    },
-    SHA512 {
-      @Override
-      long checksum(byte[] bytes, int size) {
-        return sha512.hashBytes(bytes, 0, size).asLong();
-      }
-    },
-    MD5 {
-      @Override
-      long checksum(byte[] bytes, int size) {
-        return md5.hashBytes(bytes, 0, size).asLong();
-      }
-    },
-    GOOD_FAST_HASH_32 {
-      @Override
-      long checksum(byte[] bytes, int size) {
-        return goodFastHash32.hashBytes(bytes, 0, size).asInt();
-      }
-    },
-    GOOD_FAST_HASH_64 {
-      @Override
-      long checksum(byte[] bytes, int size) {
-        return goodFastHash64.hashBytes(bytes, 0, size).asLong();
-      }
-    },
-    XXH32_JNI {
-      long checksum(byte[] bytes, int size) {
-        return xxhash32JNI.hash(bytes, 0, size, 0x9747b28c);
-      }
-    },
-    XXH32_UNSAFE {
-      long checksum(byte[] bytes, int size) {
-        return xxhash32Unsafe.hash(bytes, 0, size, 0x9747b28c);
-      }
-    },
-    XXH32_SAFE {
-      long checksum(byte[] bytes, int size) {
-        return xxhash32Safe.hash(bytes, 0, size, 0x9747b28c);
-      }
-    },
-    XXH64_JNI {
-      long checksum(byte[] bytes, int size) {
-        return xxhash64JNI.hash(bytes, 0, size, 0x9747b28c);
-      }
-    },
-    XXH64_UNSAFE {
-      long checksum(byte[] bytes, int size) {
-        return xxhash64Unsafe.hash(bytes, 0, size, 0x9747b28c);
-      }
-    },
-    XXH64_SAFE {
-      long checksum(byte[] bytes, int size) {
-        return xxhash64Safe.hash(bytes, 0, size, 0x9747b28c);
-      }
-    };
-    
-    abstract long checksum(byte[] bytes, int size);
-  }
 
-  @Param
-  Checksum checksum;
-  
-  @Param({"16", "128", "1024", "8196", "65536", "524288"})
-  int size;
-
-  byte[] bytes;
-
-  @Override
-  public void setUp() throws Exception {
-    super.setUp();
-    Random random = new Random();
-    bytes = new byte[size];
-    random.nextBytes(bytes);
-  }
-  
-  public long timeChecksum(int reps) {
-    long dummy = 0;
-    for (int i = 0; i < reps; ++i) {
-      dummy += checksum.checksum(bytes, size);
     }
-    return dummy;
-  }
 
-  public static void main(String[] args) {
-    CaliperMain.main(ChecksumBenchmark.class, args);
-  }
-  
+    @Benchmark
+    public long javaUtilArraysHashCode(State state) {
+        return Arrays.hashCode(state.bytes);
+    }
+
+    @Benchmark
+    public long adler32(State state) {
+        adler32.reset();
+        adler32.update(state.bytes, 0, state.size);
+        return adler32.getValue();
+    }
+
+    @Benchmark
+    public long crc32(State state) {
+        crc32.reset();
+        crc32.update(state.bytes, 0, state.size);
+        return crc32.getValue();
+    }
+
+    @Benchmark
+    public long murmur2(State state) {
+        return MurmurHash2.hash32(state.bytes, 0, state.size);
+    }
+
+    @Benchmark
+    public long murmur3(State state) {
+        return murmur3.hashBytes(state.bytes, 0, state.size).asInt();
+    }
+
+    @Benchmark
+    public long sha1(State state) {
+        return sha1.hashBytes(state.bytes, 0, state.size).asLong();
+    }
+
+    @Benchmark
+    public long sha256(State state) {
+        return sha256.hashBytes(state.bytes, 0, state.size).asLong();
+    }
+
+    @Benchmark
+    public long sha512(State state) {
+        return sha512.hashBytes(state.bytes, 0, state.size).asLong();
+    }
+
+    @Benchmark
+    public long md5(State state) {
+        return md5.hashBytes(state.bytes, 0, state.size).asLong();
+    }
+
+
+    @Benchmark
+    public long goodFastHash32(State state) {
+        return goodFastHash32.hashBytes(state.bytes, 0, state.size).asInt();
+    }
+
+    @Benchmark
+    public long goodFastHash64(State state) {
+        return goodFastHash64.hashBytes(state.bytes, 0, state.size).asLong();
+    }
+
+    public long xxHash32JNI(State state) {
+        return xxhash32JNI.hash(state.bytes, 0, state.size, 0x9747b28c);
+    }
+
+    public long xxHash32Unsafe(State state) {
+        return xxhash32Unsafe.hash(state.bytes, 0, state.size, 0x9747b28c);
+    }
+
+    public long xxHash32(State state) {
+        return xxhash32Safe.hash(state.bytes, 0, state.size, 0x9747b28c);
+    }
+
+    public long xxHash64JNI(State state) {
+        return xxhash64JNI.hash(state.bytes, 0, state.size, 0x9747b28c);
+    }
+
+    public long xxHash64Unsafe(State state) {
+        return xxhash64Unsafe.hash(state.bytes, 0, state.size, 0x9747b28c);
+    }
+
+    public long xxHash64(State state) {
+        return xxhash64Safe.hash(state.bytes, 0, state.size, 0x9747b28c);
+    }
+
+    public static void main(String[] args) throws IOException, RunnerException {
+        Options options = new OptionsBuilder()
+                .include(ChecksumBenchmark.class.getSimpleName())
+                .forks(1)
+                .warmupIterations(5)
+                .measurementIterations(5)
+                .build();
+        new Runner(options).run();
+    }
+
 }
