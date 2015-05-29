@@ -115,26 +115,32 @@ public class ChecksumBenchmark {
         return goodFastHash64.hashBytes(state.bytes, 0, state.size).asLong();
     }
 
+    @Benchmark
     public long xxHash32JNI(State state) {
         return xxhash32JNI.hash(state.bytes, 0, state.size, 0x9747b28c);
     }
 
+    @Benchmark
     public long xxHash32Unsafe(State state) {
         return xxhash32Unsafe.hash(state.bytes, 0, state.size, 0x9747b28c);
     }
 
+    @Benchmark
     public long xxHash32(State state) {
         return xxhash32Safe.hash(state.bytes, 0, state.size, 0x9747b28c);
     }
 
+    @Benchmark
     public long xxHash64JNI(State state) {
         return xxhash64JNI.hash(state.bytes, 0, state.size, 0x9747b28c);
     }
 
+    @Benchmark
     public long xxHash64Unsafe(State state) {
         return xxhash64Unsafe.hash(state.bytes, 0, state.size, 0x9747b28c);
     }
 
+    @Benchmark
     public long xxHash64(State state) {
         return xxhash64Safe.hash(state.bytes, 0, state.size, 0x9747b28c);
     }
